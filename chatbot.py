@@ -17,17 +17,20 @@ os.makedirs("data", exist_ok=True)
 PROFILE_FILE = "data/profile.json"
 LOG_FILE = "data/log.json"
 
-# 4. 모드별 AI 성격 및 규칙
+# 4. 모드별 AI 성격 및 규칙 (페르소나는 영어로 작성, 답변은 한국어로 하도록 지시)
 MODES = {
-    "1": ("공부 메이트", "공부를 도와줘. 퀴즈는 한 문제씩 내고 채점해줘. 코딩 질문은 힌트를 먼저 주고, 더 달라고 하면 풀이를 알려줘."),
-    "2": ("일상 기록", "사용자가 말한 지출, 일정, 공부 시간을 짧게 확인해줘. "
-                      "기록할 내용이 있으면 답변 맨 끝에 한 줄씩 아래 형식으로 붙여줘. "
-                      '기록: {"type": "expense", "title": "점심", "amount": 9000} '
-                      '기록: {"type": "study", "title": "파이썬", "minutes": 90} '
-                      '기록: {"type": "schedule", "title": "면접", "when": "2026-10-21 15:00"} '
-                      "amount와 minutes는 숫자만 써."),
-    "3": ("취업 코치", "취업 코치야. 직무 설명, 자소서 첨삭, 모의 면접을 해줘. "
-                      "면접은 질문을 하나씩 하고, 답변을 받으면 장점, 보완점, 점수(10점 만점)를 알려줘."),
+    "1": ("공부 메이트", "You are a study mate. Quiz the user one question at a time and grade the answer. "
+                      "For coding questions, give a hint first, and give the full solution only when the user asks for more."),
+    "2": ("일상 기록", "You are a daily log assistant. Briefly confirm the expenses, schedules, and study time the user mentions. "
+                      "If there is anything to record, append one line per item at the very end of your reply in this format: "
+                      'RECORD: {"type": "expense", "title": "lunch", "amount": 9000} '
+                      'RECORD: {"type": "study", "title": "Python", "minutes": 90} '
+                      'RECORD: {"type": "schedule", "title": "interview", "when": "2026-10-21 15:00"} '
+                      "Use plain numbers only for amount and minutes. Write each title in Korean. "
+                      "Never put anything else on a RECORD line."),
+    "3": ("취업 코치", "You are a strict but supportive career coach. Explain job roles, review cover letters, and run mock interviews. "
+                      "In a mock interview, ask one question at a time; after each answer, give strengths, areas to improve, "
+                      "and a score out of 10."),
 }
 
 
@@ -78,14 +81,14 @@ def ask(messages):
         return ask_gemini(messages)
 
 
-# 7. 답변에서 '기록:' 줄을 찾아 저장하고, 나머지 본문만 돌려주는 함수
+# 7. 답변에서 'RECORD:' 줄을 찾아 저장하고, 나머지 본문만 돌려주는 함수
 def save_records(answer):
     log = load_json(LOG_FILE, [])
     lines = []
     for line in answer.split("\n"):
-        if line.strip().startswith("기록:"):
+        if line.strip().startswith("RECORD:"):
             try:
-                record = json.loads(line.strip()[3:])
+                record = json.loads(line.strip()[len("RECORD:"):])
                 record["date"] = date.today().isoformat()
                 log.append(record)
                 print(colored(f"[저장됨] {record}", "green"))
@@ -97,65 +100,77 @@ def save_records(answer):
     return "\n".join(lines).strip()
 
 
-# 8. 프로필(목표) 불러오기, 없으면 입력받기
-profile = load_json(PROFILE_FILE, {})
-if not profile:
-    profile["job"] = input("목표 직무 : ")
-    profile["studying"] = input("공부 중인 과목 : ")
-    save_json(PROFILE_FILE, profile)
-
-# 9. 모드 선택
-print("1. 공부 메이트  2. 일상 기록  3. 취업 코치")
-mode = input("모드 선택 : ")
-if mode not in MODES:
-    mode = "1"
-mode_name, mode_rule = MODES[mode]
-
-# 10. 대화 기록 맨 앞에 AI 성격 및 규칙 지정
-messages = [
-    {
-        "role": "system",
-        "content": (
-            f"너는 취업을 준비하는 사용자의 자기개발 메이트야. 한국어로 답해줘. "
-            f"실시간 정보는 모르니까 모르면 모른다고 말해줘. "
-            f"오늘 날짜는 {date.today().isoformat()}이야. "
-            f"사용자의 목표 직무는 {profile['job']}이고 공부 중인 과목은 {profile['studying']}이야. "
-            f"[{mode_name} 모드] {mode_rule}"
-        ),
-    }
-]
-print(f"\n[{mode_name}] 시작! 종료는 exit\n")
-
-# 11. 대화 진행 및 종료 입력 설정
-while True:
-    # 11-1. 질문
-    q = input("나 : ")
-    # 11-2. 종료 입력
-    if q == "exit":
-        print("대화를 종료합니다")
-        break
-    # 11-3. 질문을 대화 기록에 추가
-    messages.append(
-        {
-            "role": "user",
-            "content": q
-        }
+# 8. 프로필과 모드를 받아 시스템 프롬프트(AI 성격 및 규칙) 만드는 함수
+def make_system(profile, mode_name, mode_rule):
+    return (
+        "You are a self-development mate for a user preparing for a job. "
+        "Always reply in Korean, in a friendly tone. "
+        "You cannot access real-time information, so say so honestly when you don't know. "
+        f"Today's date is {date.today().isoformat()}. "
+        f"The user's target job is {profile['job']} and the subjects they are studying are {profile['studying']}. "
+        f"[Mode: {mode_name}] {mode_rule}"
     )
-    # 11-4. 질문 보내고 답변 받기
-    try:
-        answer = ask(messages)
-    except Exception as e:
-        # groq, gemini 둘 다 실패하면 이번 질문만 취소하고 계속 진행
-        print(colored(f"답변을 가져오지 못했어요: {e}", "red"))
-        messages.pop()
-        continue
-    # 11-5. '기록:' 줄 저장하고 본문만 출력
-    text = save_records(answer)
-    print(colored(f"메이트 : {text}", "cyan"))
-    # 11-6. AI 답도 기록에 추가
-    messages.append(
+
+
+def main():
+    # 9. 프로필(목표) 불러오기, 없으면 입력받기
+    profile = load_json(PROFILE_FILE, {})
+    if not profile:
+        profile["job"] = input("목표 직무 : ")
+        profile["studying"] = input("공부 중인 과목 : ")
+        save_json(PROFILE_FILE, profile)
+
+    # 10. 모드 선택
+    print("1. 공부 메이트  2. 일상 기록  3. 취업 코치")
+    mode = input("모드 선택 : ")
+    if mode not in MODES:
+        mode = "1"
+    mode_name, mode_rule = MODES[mode]
+
+    # 11. 대화 기록 맨 앞에 AI 성격 및 규칙 지정
+    messages = [
         {
-            "role": "assistant",
-            "content": text
+            "role": "system",
+            "content": make_system(profile, mode_name, mode_rule),
         }
-    )
+    ]
+    print(f"\n[{mode_name}] 시작! 종료는 exit\n")
+
+    # 12. 대화 진행 및 종료 입력 설정
+    while True:
+        # 12-1. 질문
+        q = input("나 : ")
+        # 12-2. 종료 입력
+        if q == "exit":
+            print("대화를 종료합니다")
+            break
+        # 12-3. 질문을 대화 기록에 추가
+        messages.append(
+            {
+                "role": "user",
+                "content": q
+            }
+        )
+        # 12-4. 질문 보내고 답변 받기
+        try:
+            answer = ask(messages)
+        except Exception as e:
+            # groq, gemini 둘 다 실패하면 이번 질문만 취소하고 계속 진행
+            print(colored(f"답변을 가져오지 못했어요: {e}", "red"))
+            messages.pop()
+            continue
+        # 12-5. 'RECORD:' 줄 저장하고 본문만 출력
+        text = save_records(answer)
+        print(colored(f"메이트 : {text}", "cyan"))
+        # 12-6. AI 답도 기록에 추가
+        messages.append(
+            {
+                "role": "assistant",
+                "content": text
+            }
+        )
+
+
+# 다른 파일(web.py)에서 import해도 대화가 시작되지 않도록 직접 실행할 때만 main() 호출
+if __name__ == "__main__":
+    main()

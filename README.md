@@ -33,22 +33,32 @@ GEMINI_API_KEY=발급받은_gemini_키   # 선택: groq 한도 소진 시 폴백
 
 ## 실행
 
+**터미널 버전**
+
 ```bash
 python chatbot.py
 ```
 
 모드 번호를 고르고 대화합니다. 종료는 `exit`.
 
+**웹 버전** (같은 챗봇 로직을 화면으로 감싼 버전)
+
+```bash
+streamlit run web.py
+```
+
+브라우저에서 `http://localhost:8501`이 열립니다. 모드별 테마 색, 예시 질문 버튼, '이번 주 기록' 탭(공부 시간·지출 차트, 일정 표)을 제공합니다.
+
 ## 파일 구조
 
 ```
 chatbot.py        챗봇 본체 (대화 루프, 모드, 기록 저장, gemini 폴백)
+web.py            웹 화면 (chatbot.py의 함수를 가져다 사용)
 data/             profile.json, log.json (자동 생성, 깃 제외)
 requirements.txt  필요 라이브러리
-streamlit_version/ 웹 UI 버전 (참고용, 추가 설치: pip install streamlit pandas)
 ```
 
 ## 한계
 
 - 모델은 실시간 인터넷 검색을 하지 않습니다. 채용 공고, 최신 가격 같은 정보는 알 수 없습니다.
-- 기록은 AI 답변의 `기록:` 줄에서 추출하므로, 가끔 형식이 틀리면 저장되지 않을 수 있습니다.
+- 기록은 AI 답변의 `RECORD:` 줄에서 추출하므로, 가끔 형식이 틀리면 저장되지 않을 수 있습니다.
