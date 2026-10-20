@@ -125,7 +125,7 @@ def card(label, value):
 
 
 # 5. 채팅 탭
-def chat_tab(mode, profile):
+def chat_tab(mode, profile, q):
     mode_name, mode_rule = bot.MODES[mode]
     history = st.session_state.setdefault(f"chat:{mode}", [])
 
@@ -138,7 +138,6 @@ def chat_tab(mode, profile):
         with st.chat_message(msg["role"], avatar=STYLE[mode]["icon"] if msg["role"] == "assistant" else None):
             st.markdown(msg["content"])
 
-    q = st.chat_input("메시지를 입력하세요")
     if not q:
         return
 
@@ -291,8 +290,11 @@ st.markdown(
 if profile["job"] == "미설정":
     st.info("왼쪽 '내 목표 설정'에 직무와 공부 과목을 저장하면 답변이 내 목표에 맞춰져요.")
 
+# 입력창은 탭 밖(최상위)에 둬야 화면 하단에 고정되어 스크롤해도 위치가 바뀌지 않는다
+q = st.chat_input("메시지를 입력하세요")
+
 tab_chat, tab_record = st.tabs(["💬 채팅", STYLE[mode]["tab"]])
 with tab_chat:
-    chat_tab(mode, profile)
+    chat_tab(mode, profile, q)
 with tab_record:
     record_tab(mode, profile)
