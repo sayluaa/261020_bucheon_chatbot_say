@@ -20,7 +20,10 @@ LOG_FILE = "data/log.json"
 # 4. 모드별 AI 성격 및 규칙 (페르소나는 영어로 작성, 답변은 한국어로 하도록 지시)
 MODES = {
     "1": ("공부 메이트", "You are a study mate. Quiz the user one question at a time and grade the answer. "
-                      "For coding questions, give a hint first, and give the full solution only when the user asks for more."),
+                      "For coding questions, give a hint first, and give the full solution only when the user asks for more. "
+                      "When the user says how long they studied, append one line at the very end of your reply: "
+                      'RECORD: {"type": "study", "title": "Python", "minutes": 90} '
+                      "Use a plain number for minutes, write the title in Korean, and never put anything else on a RECORD line."),
     "2": ("일상 기록", "You are a daily log assistant. Briefly confirm the expenses, schedules, and study time the user mentions. "
                       "If there is anything to record, append one line per item at the very end of your reply in this format: "
                       'RECORD: {"type": "expense", "title": "lunch", "amount": 9000} '
@@ -30,7 +33,24 @@ MODES = {
                       "Never put anything else on a RECORD line."),
     "3": ("취업 코치", "You are a strict but supportive career coach. Explain job roles, review cover letters, and run mock interviews. "
                       "In a mock interview, ask one question at a time; after each answer, give strengths, areas to improve, "
-                      "and a score out of 10."),
+                      "and a score out of 10. "
+                      "You cannot browse live job postings, so never invent postings; if asked for current openings, "
+                      "say you cannot see them and ask the user to paste a posting. "
+                      "At the very end of your reply, append one RECORD line per item in these formats. "
+                      "When the user pastes a job posting, summarize it briefly and record it: "
+                      'RECORD: {"type": "job", "company": "ABC", "title": "AI engineer", "deadline": "2026-11-15", "note": "Python, PyTorch"} '
+                      "(deadline is YYYY-MM-DD, or an empty string if unknown). "
+                      "When the user asks which certifications suit their target job, recommend at most 5 and record each. "
+                      "Only recommend certifications that you are sure currently exist, preferring Korean national technical qualifications "
+                      "and widely recognized industry certificates (including ones the user is already studying for); "
+                      "if you are not sure a certification still exists, do not recommend it: "
+                      'RECORD: {"type": "cert", "name": "Engineer Information Processing", "level": "medium", "reason": "Useful for developer roles"} '
+                      "(level is easy, medium, or hard). "
+                      "For interview or document deadlines the user mentions, record: "
+                      'RECORD: {"type": "schedule", "title": "1차 면접", "when": "2026-10-21 15:00"} '
+                      "Write company, title, name, reason and note in Korean, keep them short, and do not use double quotes inside values. "
+                      "Never put anything else on a RECORD line. "
+                      "When recommending certifications, remind the user that exam dates and fees may be outdated and should be checked on official sites."),
 }
 
 
@@ -81,7 +101,18 @@ def ask(messages):
         return ask_gemini(messages)
 
 
-# 7. 답변에서 'RECORD:' 줄을 찾아 저장하고, 나머지 본문만 돌려주는 함수
+# 7. 같은 공고/자격증이 이미 저장돼 있는지 확인하는 함수
+def is_duplicate(log, record):
+    fields = {"job": ["company", "title"], "cert": ["name"]}.get(record.get("type"))
+    if not fields:
+        return False
+    return any(
+        r.get("type") == record["type"] and all(r.get(f) == record.get(f) for f in fields)
+        for r in log
+    )
+
+
+# 7-1. 답변에서 'RECORD:' 줄을 찾아 저장하고, 나머지 본문만 돌려주는 함수
 def save_records(answer):
     log = load_json(LOG_FILE, [])
     lines = []
@@ -90,6 +121,8 @@ def save_records(answer):
             try:
                 record = json.loads(line.strip()[len("RECORD:"):])
                 record["date"] = date.today().isoformat()
+                if is_duplicate(log, record):
+                    continue
                 log.append(record)
                 print(colored(f"[저장됨] {record}", "green"))
             except json.JSONDecodeError:
@@ -106,7 +139,8 @@ def make_system(profile, mode_name, mode_rule):
         "You are a self-development mate for a user preparing for a job. "
         "Always reply in Korean, in a friendly tone. "
         "You cannot access real-time information, so say so honestly when you don't know. "
-        f"Today's date is {date.today().isoformat()}. "
+        f"Today's date is {date.today().isoformat()} ({date.today().strftime('%A')}). "
+        "Resolve relative dates such as 'next Monday' or 'tomorrow' from today's date and weekday. "
         f"The user's target job is {profile['job']} and the subjects they are studying are {profile['studying']}. "
         f"[Mode: {mode_name}] {mode_rule}"
     )
