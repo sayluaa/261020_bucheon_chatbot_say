@@ -11,18 +11,15 @@ st.set_page_config(page_title="자기개발 메이트", page_icon="🎯", layout
 STYLE = {
     "1": {
         "icon": "📚", "color": "#4F7CFF",
-        "desc": "퀴즈를 풀고, 막히는 코드는 힌트부터 받아보세요.",
-        "examples": ["파이썬 리스트 퀴즈 하나 내줘", "정보처리기사 실기 SQL 문제 내줘", "for문이 헷갈려, 힌트만 줘"],
+        "desc": "퀴즈를 풀고, 막히는 코드는 힌트부터 받아보세요."
     },
     "2": {
         "icon": "📅", "color": "#1FB58A",
         "desc": "말하듯 적으면 지출·일정·공부 시간이 자동으로 기록돼요.",
-        "examples": ["오늘 점심 9천원 먹고 파이썬 2시간 공부했어", "내일 오후 3시에 면접 있어", "이번 주 어땠는지 요약해줘"],
     },
     "3": {
         "icon": "💼", "color": "#E8774A",
-        "desc": "직무 설명, 자소서 첨삭, 모의 면접까지 코칭해드려요.",
-        "examples": ["모의 면접 시작해줘", "내 직무에서 중요한 역량이 뭐야?", "자기소개 첨삭해줘"],
+        "desc": "직무 설명, 자소서 첨삭, 모의 면접까지 코칭해드려요."
     },
 }
 
@@ -121,16 +118,7 @@ def chat_tab(mode, profile):
         with st.chat_message(msg["role"], avatar=STYLE[mode]["icon"] if msg["role"] == "assistant" else None):
             st.markdown(msg["content"])
 
-    # 대화가 비어 있으면 예시 질문 버튼 보여주기
-    picked = None
-    if not history:
-        st.caption("이렇게 시작해보세요")
-        cols = st.columns(len(STYLE[mode]["examples"]))
-        for col, ex in zip(cols, STYLE[mode]["examples"]):
-            if col.button(ex, key=f"ex:{mode}:{ex}", use_container_width=True):
-                picked = ex
-
-    q = st.chat_input("메시지를 입력하세요") or picked
+    q = st.chat_input("메시지를 입력하세요")
     if not q:
         return
 
