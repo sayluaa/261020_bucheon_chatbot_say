@@ -54,7 +54,7 @@ def ask_gemini(messages):
     for m in messages[1:]:
         role = "user" if m["role"] == "user" else "model"
         contents.append({"role": role, "parts": [{"text": m["content"]}]})
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
     res = httpx.post(
         url,
         headers={"x-goog-api-key": key},
@@ -142,7 +142,13 @@ while True:
         }
     )
     # 11-4. 질문 보내고 답변 받기
-    answer = ask(messages)
+    try:
+        answer = ask(messages)
+    except Exception as e:
+        # groq, gemini 둘 다 실패하면 이번 질문만 취소하고 계속 진행
+        print(colored(f"답변을 가져오지 못했어요: {e}", "red"))
+        messages.pop()
+        continue
     # 11-5. '기록:' 줄 저장하고 본문만 출력
     text = save_records(answer)
     print(colored(f"메이트 : {text}", "cyan"))
